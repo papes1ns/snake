@@ -11,6 +11,8 @@ define(function() {
   constants.GAME_FOOD_PIECE  = 2;
 
   constants.DEFAULT_SNAKE_LENGTH = 4;
+  constants.DEFAULT_SNAKE_POSITION_Y = 10;
+  constants.DEFAULT_SNAKE_POSITION_X = 10;
 
   return constants;
 });

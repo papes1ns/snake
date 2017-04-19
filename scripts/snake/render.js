@@ -16,7 +16,7 @@ define(function(require) {
     for(var y = 0; y < this._board.length; y++) {
       html += "<tr>";
       for(x = 0; x < this._board[y].length; x++) {
-        html += "<td key='" + this._board[y][x].key() + "'></td>";
+        html += "<td data-key='" + this._board[y][x].key() + "'></td>";
       };
       html += "</tr>";
     };

@@ -10,8 +10,9 @@ define(function(require) {
   };
 
   Game.prototype.start = function() {
-    this.board.setSnake(this.snake);
     this._renderer.render();
+    this.board.setSnake(this.snake);
+    console.log(this.board.getPieceNode(10,10).key());
   };
 
   return Game;

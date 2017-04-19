@@ -21,17 +21,28 @@ define(function(require) {
 
   function Board() {
     var board = buildBoard();
-    // board needs to act like an array but also a respond to game related calls
     return _.extend(board, methods);
   }
 
   methods = new Object();
 
-  methods.height = function() {
-    return this.length;
+  methods.getPieceNode = function(y, x) {
+    var node = Piece.getNode(y, x);
+    return _.extend(node, this[y][x]);
   };
 
-  methods.setSnake
+  methods.setSnake = function(snake) {
+    for(var i = 0; i < snake.length; i++) {
+      var y, x, snake, node;
+      piece = snake[i];
+      y = piece.positionY;
+      x = piece.positionX;
+      node = this.getPieceNode(y, x);
+      node.className += " snake";
+      // swap the default board piece with the snakes piece
+      this[y][x] = piece;
+    };
+  };
 
   return Board;
 

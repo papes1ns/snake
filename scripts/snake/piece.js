@@ -1,5 +1,10 @@
 define(function(require) {
-  var Constants = require("snake/constants");
+  var Constants = require("snake/constants"),
+      _         = require("lib/lodash");
+
+  function buildKey(y, x) {
+    return [y.toString(), x.toString()].join(":");
+  };
 
   function Piece(y, x, state) {
     this.positionY = y;
@@ -7,8 +12,12 @@ define(function(require) {
     this._state = state;
   };
 
+  Piece.getNode = function(y, x) {
+    return document.querySelector('[data-key = "'+ buildKey(y,x) +'"]');
+  };
+
   Piece.prototype.key = function() {
-    return [this.positionY.toString(), this.positionX.toString()].join(":");
+    return buildKey(this.positionY, this.positionX);
   };
 
   Piece.prototype.isEmpty = function() {
@@ -20,7 +29,11 @@ define(function(require) {
   };
 
   Piece.prototype.isSnake = function() {
-    return this._state.state == Constants.GAME_SNAKE_PIECE;
+    return this._state == Constants.GAME_SNAKE_PIECE;
+  };
+
+  Piece.prototype.updateState = function(state) {
+    this._state = state;
   };
 
   return Piece;
