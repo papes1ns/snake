@@ -44,6 +44,27 @@ define(function(require) {
     };
   };
 
+  methods.render = function() {
+    var html, node, endTime, startTime = new Date();
+
+    html = new String();
+    html += "<table>";
+    for(var y = 0; y < this.length; y++) {
+      html += "<tr>";
+      for(x = 0; x < this[y].length; x++) {
+        html += "<td data-key='" + this[y][x].key() + "'></td>";
+      };
+      html += "</tr>";
+    };
+    html += "</table>";
+
+    node = document.getElementById(Constants.GAME_CONTAINER_ID);
+    node.innerHTML = html;
+    
+    endTime = new Date();
+    console.log("rendered board in "+ (endTime - startTime) + " ms");
+  };
+
   return Board;
 
 });

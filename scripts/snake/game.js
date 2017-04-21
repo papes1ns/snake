@@ -1,18 +1,24 @@
 define(function(require) {
-  var Board  = require("snake/board"),
-      Render = require("snake/render"),
-      Snake  = require("snake/snake");
+  var Board     = require("snake/board"),
+      Constants = require("snake/constants"),
+      Snake     = require("snake/snake");
 
   function Game() {
     this.snake = new Snake();
     this.board = new Board();
-    this._renderer = new Render(this.board);
+    this.direction = Constants.DIRECTION_WEST;
+    this.interval = Constants.TICK_INTERVAL;
+    this.state = Constants.GAME_STATE_PAUSED;
   };
 
   Game.prototype.start = function() {
-    this._renderer.render();
-    this.board.setSnake(this.snake);
-    console.log(this.board.getPieceNode(10,10).key());
+    this.board.render();
+    main();
+  };
+
+
+  function main(){
+    
   };
 
   return Game;

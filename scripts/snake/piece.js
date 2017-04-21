@@ -6,10 +6,10 @@ define(function(require) {
     return [y.toString(), x.toString()].join(":");
   };
 
-  function Piece(y, x, state) {
+  function Piece(y, x, type) {
     this.positionY = y;
     this.positionX = x;
-    this._state = state;
+    this.type = type;
   };
 
   Piece.getNode = function(y, x) {
@@ -21,19 +21,15 @@ define(function(require) {
   };
 
   Piece.prototype.isEmpty = function() {
-    return this._state == Constants.GAME_EMPTY_PIECE;
+    return this.type == Constants.GAME_EMPTY_PIECE;
   };
 
   Piece.prototype.isFood = function() {
-    return this._state == Constants.GAME_FOOD_PIECE;
+    return this.type == Constants.GAME_FOOD_PIECE;
   };
 
   Piece.prototype.isSnake = function() {
-    return this._state == Constants.GAME_SNAKE_PIECE;
-  };
-
-  Piece.prototype.updateState = function(state) {
-    this._state = state;
+    return this.type == Constants.GAME_SNAKE_PIECE;
   };
 
   return Piece;
