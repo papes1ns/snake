@@ -1,7 +1,11 @@
 define(function(require) {
   var Board     = require("snake/board"),
       Constants = require("snake/constants"),
-      Snake     = require("snake/snake");
+      Snake     = require("snake/snake"),
+      scoreNode = document.getElementById("score"),
+      rateNode  = document.getElementById("rate");
+
+
 
   function Game() {
     this.snake = new Snake();
@@ -14,6 +18,8 @@ define(function(require) {
 
   Game.prototype.start = function() {
     this.board.render();
+    scoreNode.innerHTML = this.score;
+    rateNode.innerHTML = this.tickInterval();
     this.spawnSnake();
     this.generateFood();
     this.tick();
@@ -50,9 +56,13 @@ define(function(require) {
       that.moveOne();
 
       that.tick();
-    }, Constants.TICK_INTERVAL - (this.score * Constants.TICK_FASTER_MULTIPLYER));
+    }, this.tickInterval());
   };
 
+
+  Game.prototype.tickInterval = function() {
+    return Constants.TICK_INTERVAL - (this.score * Constants.TICK_FASTER_MULTIPLYER);
+  };
 
   Game.prototype.moveOne = function() {
     var head, position, tail, y, x, shouldGrow = false;
@@ -99,6 +109,8 @@ define(function(require) {
         console.log("yummy!");
         this.generateFood();
         this.score++;
+        scoreNode.innerHTML = this.score;
+        rateNode.innerHTML = this.tickInterval();
       };
 
       head.className = "snake";
