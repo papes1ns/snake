@@ -72,7 +72,11 @@ define(function(require) {
 
       if (!head || head.piece.isSnake()) {
         console.log("collision at y:" + y + ", x:" + x);
-        head.className = " red";
+        if (!head) {
+          this.snake.pieces[0].className = "red";
+        } else {
+          head.className = "red";
+        };
         this.state = Constants.GAME_STATE_DONE;
         return;
       };
