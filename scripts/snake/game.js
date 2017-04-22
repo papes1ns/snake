@@ -9,6 +9,7 @@ define(function(require) {
     this.direction = Constants.DIRECTION_NORTH;
     this.state = Constants.GAME_STATE_PLAYING;
     this.score = 0;
+    this.directionKeyRegistered = false;
   };
 
   Game.prototype.start = function() {
@@ -74,6 +75,7 @@ define(function(require) {
                     this.snake.pieces[0].piece.positionX - 1];
         break;
       };
+      this.directionKeyRegistered = false;
 
       y = position[0];
       x = position[1];
@@ -116,6 +118,7 @@ define(function(require) {
   };
 
   Game.prototype.setDirection = function(direction) {
+    if (this.directionKeyRegistered) { return; };
     switch(this.direction) {
       case Constants.DIRECTION_NORTH:
         if (direction != Constants.DIRECTION_SOUTH) { this.direction = direction};
@@ -130,6 +133,7 @@ define(function(require) {
         if (direction != Constants.DIRECTION_WEST) { this.direction = direction};
         break;
     };
+    this.directionKeyRegistered = true;
   }
 
   Game.prototype.generateFood = function() {
