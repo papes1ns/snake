@@ -20,7 +20,7 @@ define(function(require) {
     if(initialized == true) { return; };
 
     document.onkeydown = function(evt) {
-    evt = evt || window.event;
+      evt = evt || window.event;
 
       switch(evt.keyCode) {
         case keyMap.LEFT:

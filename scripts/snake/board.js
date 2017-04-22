@@ -31,7 +31,7 @@ define(function(require) {
   };
 
   Board.prototype.exists = function(y, x) {
-    if (y > Constants.GAME_HEIGHT || y < 0 || x > Constants.GAME_WIDTH || x < 0) {
+    if (y > Constants.GAME_HEIGHT-1 || y < 0 || x > Constants.GAME_WIDTH-1 || x < 0) {
       return false;
     };
     return true;
@@ -62,19 +62,6 @@ define(function(require) {
     if (!this.exists(y, x)) { return null; };
     this.pieces[y][x].type = type;
   };
-
-
-  Board.prototype.numSnakePieces = function() {
-    var count = 0;
-    for (var y = 0; y < this.pieces.length; y++) {
-      for (var x = 0; x < this.pieces[y].length; x ++) {
-        if (this.pieces[y][x].isSnake()) {
-          count++;
-        };
-      };
-    };
-    return count;
-  }
 
   return Board;
 

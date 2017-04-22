@@ -3,21 +3,26 @@
   <head>
     <title>Snake</title>
     <style>
-      .red {
+      .collision {
         background-color: red;
       }
       .snake {
         background-color: black;
       }
+      .food {
+        background-color: green;
+      }
       #main > table {
         box-sizing: border-box;
+        border-collapse: collapse;
+        border: 1px solid #ddd;
       }
       #main > table td {
         margin: 0;
         padding: 0;
         width: 1.5em;
         height: 1.5em;
-        border: 1px solid #ddd;
+        border: none;
       }
     </style>
   </head>

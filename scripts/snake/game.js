@@ -7,13 +7,14 @@ define(function(require) {
     this.snake = new Snake();
     this.board = new Board();
     this.direction = Constants.DIRECTION_NORTH;
-    this.interval = Constants.TICK_INTERVAL;
     this.state = Constants.GAME_STATE_PLAYING;
+    this.score = 0;
   };
 
   Game.prototype.start = function() {
     this.board.render();
     this.spawnSnake();
+    this.generateFood();
     this.tick();
   };
 
@@ -25,8 +26,12 @@ define(function(require) {
         Constants.DEFAULT_SNAKE_POSITION_Y,
         Constants.DEFAULT_SNAKE_POSITION_X - i
       );
-      node.className += " snake";
-      this.board.setPieceType(node.piece.positionY, node.piece.positionX, Constants.GAME_SNAKE_PIECE);
+      node.className = "snake";
+      this.board.setPieceType(
+        node.piece.positionY,
+        node.piece.positionX,
+        Constants.GAME_SNAKE_PIECE
+      );
       this.snake.pieces[i] = node;
     };
 
@@ -36,32 +41,37 @@ define(function(require) {
     var that = this;
 
     setTimeout(function() {
-      if (that.state == Constants.GAME_STATE_PAUSED || that.state == Constants.GAME_STATE_DONE) {
+      if (that.state == Constants.GAME_STATE_PAUSED ||
+          that.state == Constants.GAME_STATE_DONE) {
         return;
       };
 
       that.moveOne();
 
       that.tick();
-    }, that.interval);
+    }, Constants.TICK_INTERVAL - (this.score * Constants.TICK_FASTER_MULTIPLYER));
   };
 
 
   Game.prototype.moveOne = function() {
-    var head, position, tail, y, x;
+    var head, position, tail, y, x, shouldGrow = false;
 
     switch (this.direction) {
       case Constants.DIRECTION_NORTH:
-        position = [this.snake.pieces[0].piece.positionY - 1, this.snake.pieces[0].piece.positionX];
+        position = [this.snake.pieces[0].piece.positionY - 1,
+                    this.snake.pieces[0].piece.positionX];
         break;
       case Constants.DIRECTION_EAST:
-        position = [this.snake.pieces[0].piece.positionY, this.snake.pieces[0].piece.positionX + 1];
+        position = [this.snake.pieces[0].piece.positionY,
+                    this.snake.pieces[0].piece.positionX + 1];
         break;
       case Constants.DIRECTION_SOUTH:
-        position = [this.snake.pieces[0].piece.positionY + 1, this.snake.pieces[0].piece.positionX];
+        position = [this.snake.pieces[0].piece.positionY + 1,
+                    this.snake.pieces[0].piece.positionX];
         break;
       case Constants.DIRECTION_WEST:
-        position = [this.snake.pieces[0].piece.positionY, this.snake.pieces[0].piece.positionX - 1];
+        position = [this.snake.pieces[0].piece.positionY,
+                    this.snake.pieces[0].piece.positionX - 1];
         break;
       };
 
@@ -73,21 +83,35 @@ define(function(require) {
       if (!head || head.piece.isSnake()) {
         console.log("collision at y:" + y + ", x:" + x);
         if (!head) {
-          this.snake.pieces[0].className = "red";
+          this.snake.pieces[0].className = "collision";
         } else {
-          head.className = "red";
+          head.className = "collision";
         };
         this.state = Constants.GAME_STATE_DONE;
         return;
       };
 
-      head.className += " snake";
+
+      if (head.piece.isFood()) {
+        shouldGrow = true;
+        console.log("yummy!");
+        this.generateFood();
+        this.score++;
+      };
+
+      head.className = "snake";
       this.board.setPieceType(y, x, Constants.GAME_SNAKE_PIECE);
       this.snake.pieces.unshift(head);
 
-      tail = this.snake.pieces.pop();
-      tail.classList.remove("snake");
-      this.board.setPieceType(tail.piece.positionY, tail.piece.positionX, Constants.GAME_EMPTY_PIECE);
+      if(!shouldGrow) {
+        tail = this.snake.pieces.pop();
+        tail.classList.remove("snake");
+        this.board.setPieceType(
+          tail.piece.positionY,
+          tail.piece.positionX,
+          Constants.GAME_EMPTY_PIECE
+        );
+      };
 
   };
 
@@ -106,6 +130,20 @@ define(function(require) {
         if (direction != Constants.DIRECTION_WEST) { this.direction = direction};
         break;
     };
+  }
+
+  Game.prototype.generateFood = function() {
+    var y, x, node;
+    y = Math.floor(Math.random() * (Constants.GAME_HEIGHT));
+    x = Math.floor(Math.random() * (Constants.GAME_WIDTH));
+    node = this.board.getPieceNode(y,x);
+    if (!node.piece.isEmpty()) {
+      console.log("gererated food clash");
+      console.log(node.piece);
+      return this.generateFood();
+    };
+    node.className = "food";
+    this.board.setPieceType(y, x, Constants.GAME_FOOD_PIECE);
   }
 
   Game.prototype.togglePause = function() {
