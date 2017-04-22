@@ -14,7 +14,7 @@ define(function() {
   constants.GAME_SNAKE_PIECE = 1;
   constants.GAME_FOOD_PIECE  = 2;
 
-  constants.DEFAULT_SNAKE_LENGTH = 9;
+  constants.DEFAULT_SNAKE_LENGTH = 6;
   constants.DEFAULT_SNAKE_POSITION_Y = 10;
   constants.DEFAULT_SNAKE_POSITION_X = 10;
 
@@ -23,7 +23,7 @@ define(function() {
   constants.DIRECTION_SOUTH = 3;
   constants.DIRECTION_WEST = 4;
 
-  constants.TICK_INTERVAL = 1000; // miliseconds
+  constants.TICK_INTERVAL = 200; // miliseconds
 
   return constants;
 });

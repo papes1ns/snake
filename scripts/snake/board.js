@@ -1,7 +1,6 @@
 define(function(require) {
   var Constants = require("snake/constants"),
-      Piece     = require("snake/piece"),
-      _         = require("lib/lodash");
+      Piece     = require("snake/piece");
 
   function buildBoard() {
     // board is a two-dimensional array
@@ -20,35 +19,33 @@ define(function(require) {
   };
 
   function Board() {
-    this.board = buildBoard();
-    return _.extend(this.board, mixin);
+    this.pieces = buildBoard();
   }
 
-  mixin = new Object();
-
-  mixin.getPieceNode = function(y, x) {
+  Board.prototype.getPieceNode = function(y, x) {
     if (!this.exists(y, x)) { return null; };
 
     var node = Piece.getNode(y, x);
-    return _.extend(node, this[y][x]);
+    node.piece = this.pieces[y][x];
+    return node;
   };
 
-  mixin.exists = function(y, x) {
+  Board.prototype.exists = function(y, x) {
     if (y > Constants.GAME_HEIGHT || y < 0 || x > Constants.GAME_WIDTH || x < 0) {
       return false;
     };
     return true;
   };
 
-  mixin.render = function() {
+  Board.prototype.render = function() {
     var html, node, endTime, startTime = new Date();
 
     html = new String();
     html += "<table>";
-    for(var y = 0; y < this.length; y++) {
+    for(var y = 0; y < this.pieces.length; y++) {
       html += "<tr>";
-      for(x = 0; x < this[y].length; x++) {
-        html += "<td data-key='" + this[y][x].key() + "'></td>";
+      for(x = 0; x < this.pieces[y].length; x++) {
+        html += "<td data-key='" + this.pieces[y][x].key() + "'></td>";
       };
       html += "</tr>";
     };
@@ -61,10 +58,23 @@ define(function(require) {
     console.log("rendered board in "+ (endTime - startTime) + " ms");
   };
 
-  mixin.setPieceType = function(y, x, type) {
+  Board.prototype.setPieceType = function(y, x, type) {
     if (!this.exists(y, x)) { return null; };
-    this[y][x].setType(type);
+    this.pieces[y][x].type = type;
   };
+
+
+  Board.prototype.numSnakePieces = function() {
+    var count = 0;
+    for (var y = 0; y < this.pieces.length; y++) {
+      for (var x = 0; x < this.pieces[y].length; x ++) {
+        if (this.pieces[y][x].isSnake()) {
+          count++;
+        };
+      };
+    };
+    return count;
+  }
 
   return Board;
 

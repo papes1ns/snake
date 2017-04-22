@@ -1,15 +1,11 @@
 define(function(require) {
   var Constants = require("snake/constants"),
-      Board     = require("snake/board"),
-      _         = require("lib/lodash");
+      Board     = require("snake/board");
 
   function Snake() {
     // a Snake instance is an array of Piece instances
-    this.snake = new Array(Constants.DEFAULT_SNAKE_LENGTH);
-    return _.extend(this.snake, mixin);
+    this.pieces = new Array(Constants.DEFAULT_SNAKE_LENGTH);
   };
-
-  var mixin = new Object();
 
   return Snake;
 });

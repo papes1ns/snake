@@ -20,14 +20,14 @@ define(function(require) {
   Game.prototype.spawnSnake = function() {
     var node;
 
-    for (var i = 0; i < this.snake.length; i++) {
+    for (var i = 0; i < this.snake.pieces.length; i++) {
       node = this.board.getPieceNode(
         Constants.DEFAULT_SNAKE_POSITION_Y,
         Constants.DEFAULT_SNAKE_POSITION_X - i
       );
       node.className += " snake";
-      node.type = Constants.GAME_SNAKE_PIECE;
-      this.snake[i] = node;
+      this.board.setPieceType(node.piece.positionY, node.piece.positionX, Constants.GAME_SNAKE_PIECE);
+      this.snake.pieces[i] = node;
     };
 
   };
@@ -42,11 +42,6 @@ define(function(require) {
 
       that.moveOne();
 
-      if (that.snake.collided) {
-        that.state = Constants.GAME_STATE_DONE;
-        return;
-      };
-
       that.tick();
     }, that.interval);
   };
@@ -57,16 +52,16 @@ define(function(require) {
 
     switch (this.direction) {
       case Constants.DIRECTION_NORTH:
-        position = [this.snake[0].positionY - 1, this.snake[0].positionX];
+        position = [this.snake.pieces[0].piece.positionY - 1, this.snake.pieces[0].piece.positionX];
         break;
       case Constants.DIRECTION_EAST:
-        position = [this.snake[0].positionY, this.snake[0].positionX + 1];
+        position = [this.snake.pieces[0].piece.positionY, this.snake.pieces[0].piece.positionX + 1];
         break;
       case Constants.DIRECTION_SOUTH:
-        position = [this.snake[0].positionY + 1, this.snake[0].positionX];
+        position = [this.snake.pieces[0].piece.positionY + 1, this.snake.pieces[0].piece.positionX];
         break;
       case Constants.DIRECTION_WEST:
-        position = [this.snake[0].positionY, this.snake[0].positionX - 1];
+        position = [this.snake.pieces[0].piece.positionY, this.snake.pieces[0].piece.positionX - 1];
         break;
       };
 
@@ -75,23 +70,20 @@ define(function(require) {
 
       head = this.board.getPieceNode(y, x);
 
-      if (!head) {
+      if (!head || head.piece.isSnake()) {
         console.log("collision at y:" + y + ", x:" + x);
+        head.className = " red";
         this.state = Constants.GAME_STATE_DONE;
         return;
       };
 
-      console.log(head.type);
-
       head.className += " snake";
       this.board.setPieceType(y, x, Constants.GAME_SNAKE_PIECE);
-      this.snake.unshift(head);
+      this.snake.pieces.unshift(head);
 
-      tail = this.snake.pop();
+      tail = this.snake.pieces.pop();
       tail.classList.remove("snake");
-      this.board.setPieceType(y, x, Constants.GAME_EMPTY_PIECE);
-
-
+      this.board.setPieceType(tail.piece.positionY, tail.piece.positionX, Constants.GAME_EMPTY_PIECE);
 
   };
 
