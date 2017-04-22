@@ -1,9 +1,17 @@
 define(function(require) {
   var Game             = require("snake/game"),
-      KeyboardDispatch = require("snake/keyboard_dispatch");
+      KeyboardDispatch = require("snake/keyboard_dispatch"),
+      game             = null;
 
-  var game = new Game();
-  KeyboardDispatch(game);
-  game.start();
+  function newGame() {
+    if (game) { game.stop(); };
+    game = new Game();
+    KeyboardDispatch(game);
+    game.start();
+  };
+
+  newGame();
+
+  document.getElementById("new-game").onclick = newGame;
 
 });

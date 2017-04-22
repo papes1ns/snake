@@ -172,5 +172,9 @@ define(function(require) {
     };
   };
 
+  Game.prototype.stop = function() {
+    this.state = Constants.GAME_STATE_DONE;
+  };
+
   return Game;
 });

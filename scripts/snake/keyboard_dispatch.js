@@ -8,7 +8,7 @@ define(function(require) {
     UP: 38,
     RIGHT: 39,
     DOWN: 40,
-    SPACE: 32
+    P: 80
   };
 
   function KeyboardDispatch(gameInstance) {
@@ -35,7 +35,7 @@ define(function(require) {
         case keyMap.DOWN:
           game.setDirection(Constants.DIRECTION_SOUTH);
           break;
-        case keyMap.SPACE:
+        case keyMap.P:
           game.togglePause();
           break;
       };
