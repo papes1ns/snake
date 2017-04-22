@@ -1,6 +1,5 @@
 define(function(require) {
-  var Constants = require("snake/constants"),
-      _         = require("lib/lodash");
+  var Constants = require("snake/constants");
 
   function buildKey(y, x) {
     return [y.toString(), x.toString()].join(":");
@@ -30,6 +29,10 @@ define(function(require) {
 
   Piece.prototype.isSnake = function() {
     return this.type == Constants.GAME_SNAKE_PIECE;
+  };
+
+  Piece.prototype.setType = function(type) {
+    this.type = type;
   };
 
   return Piece;

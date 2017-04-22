@@ -20,31 +20,27 @@ define(function(require) {
   };
 
   function Board() {
-    var board = buildBoard();
-    return _.extend(board, methods);
+    this.board = buildBoard();
+    return _.extend(this.board, mixin);
   }
 
-  methods = new Object();
+  mixin = new Object();
 
-  methods.getPieceNode = function(y, x) {
+  mixin.getPieceNode = function(y, x) {
+    if (!this.exists(y, x)) { return null; };
+
     var node = Piece.getNode(y, x);
     return _.extend(node, this[y][x]);
   };
 
-  methods.setSnake = function(snake) {
-    for(var i = 0; i < snake.length; i++) {
-      var y, x, snake, node;
-      piece = snake[i];
-      y = piece.positionY;
-      x = piece.positionX;
-      node = this.getPieceNode(y, x);
-      node.className += " snake";
-      // swap the default board piece with the snakes piece
-      this[y][x] = piece;
+  mixin.exists = function(y, x) {
+    if (y > Constants.GAME_HEIGHT || y < 0 || x > Constants.GAME_WIDTH || x < 0) {
+      return false;
     };
+    return true;
   };
 
-  methods.render = function() {
+  mixin.render = function() {
     var html, node, endTime, startTime = new Date();
 
     html = new String();
@@ -60,11 +56,17 @@ define(function(require) {
 
     node = document.getElementById(Constants.GAME_CONTAINER_ID);
     node.innerHTML = html;
-    
+
     endTime = new Date();
     console.log("rendered board in "+ (endTime - startTime) + " ms");
   };
 
+  mixin.setPieceType = function(y, x, type) {
+    if (!this.exists(y, x)) { return null; };
+    this[y][x].setType(type);
+  };
+
   return Board;
+
 
 });
