@@ -5,8 +5,6 @@ define(function(require) {
       scoreNode = document.getElementById("score"),
       rateNode  = document.getElementById("rate");
 
-
-
   function Game() {
     this.snake = new Snake();
     this.board = new Board();

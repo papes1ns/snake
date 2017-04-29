@@ -31,28 +31,24 @@ define(function(require) {
   };
 
   Board.prototype.exists = function(y, x) {
-    if (y > Constants.GAME_HEIGHT-1 || y < 0 || x > Constants.GAME_WIDTH-1 || x < 0) {
-      return false;
-    };
-    return true;
+    return !(y > Constants.GAME_HEIGHT-1 || y < 0 || x > Constants.GAME_WIDTH-1 || x < 0);
   };
 
   Board.prototype.render = function() {
-    var html, node, endTime, startTime = new Date();
+    var table, row, cell, node, endTime, startTime = new Date();
 
-    html = new String();
-    html += "<table>";
+    table = document.createElement("TABLE");
     for(var y = 0; y < this.pieces.length; y++) {
-      html += "<tr>";
+      row = table.insertRow(y);
       for(x = 0; x < this.pieces[y].length; x++) {
-        html += "<td data-key='" + this.pieces[y][x].key() + "'></td>";
+        cell = row.insertCell(x);
+        cell.setAttribute("data-key", this.pieces[y][x].key());
       };
-      html += "</tr>";
     };
-    html += "</table>";
 
     node = document.getElementById(Constants.GAME_CONTAINER_ID);
-    node.innerHTML = html;
+    node.removeChild(node.firstChild);
+    node.appendChild(table);
 
     endTime = new Date();
     console.log("rendered board in "+ (endTime - startTime) + " ms");
