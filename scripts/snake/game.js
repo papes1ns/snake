@@ -17,10 +17,14 @@ define(function(require) {
   Game.prototype.start = function() {
     this.board.render();
     scoreNode.innerHTML = this.score;
-    rateNode.innerHTML = this.tickInterval();
+    rateNode.innerHTML = this.nodeRate();
     this.spawnSnake();
     this.generateFood();
     this.tick();
+  };
+
+  Game.prototype.nodeRate = function() {
+    return (1000 / this.tickInterval()).toFixed(2);
   };
 
   Game.prototype.spawnSnake = function() {
@@ -108,7 +112,7 @@ define(function(require) {
         this.generateFood();
         this.score++;
         scoreNode.innerHTML = this.score;
-        rateNode.innerHTML = this.tickInterval();
+        rateNode.innerHTML = this.nodeRate();
       };
 
       head.className = "snake";
