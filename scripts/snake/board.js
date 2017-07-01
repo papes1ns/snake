@@ -47,7 +47,9 @@ define(function(require) {
     };
 
     node = document.getElementById(Constants.GAME_CONTAINER_ID);
-    node.removeChild(node.firstChild);
+    if (node.children[0]) {
+      node.removeChild(node.children[0]);
+    };
     node.appendChild(table);
 
     endTime = new Date();
