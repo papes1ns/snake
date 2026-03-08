@@ -23,8 +23,13 @@ define(function() {
   constants.DIRECTION_SOUTH = 3;
   constants.DIRECTION_WEST = 4;
 
-  constants.TICK_INTERVAL = 150; // miliseconds
-  constants.TICK_FASTER_MULTIPLYER = 5;
+  constants.TICK_BASE_INTERVAL = 100; // miliseconds
+  constants.TICK_SPEED_DIVISOR = 3;
+  constants.TICK_MIN_INTERVAL = 10;
+  constants.GAME_TIME_LIMIT = 300; // seconds
+
+  constants.HUNGER_BASE = (constants.GAME_WIDTH + constants.GAME_HEIGHT) * 2;
+  constants.HUNGER_PER_SEGMENT = 3;
 
   return constants;
 });

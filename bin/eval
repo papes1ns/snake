@@ -1,0 +1,162 @@
+#!/usr/bin/env node
+'use strict';
+
+var path         = require('path');
+var fs           = require('fs');
+var NeuralNet    = require('../src/neural_net');
+var Agent        = require('../src/agent');
+var HeadlessGame = require('../src/headless_game');
+
+var args         = parseArgs(process.argv.slice(2));
+var modelPath    = args.model || args.m || path.join(__dirname, '..', 'models', 'best.json');
+var numGames     = parseInt(args.games || args.n) || 100;
+var watchMode    = args.watch || args.w || false;
+var timeLimitSec = parseInt(args.time || args.t)  || 100;
+
+HeadlessGame.setTimeLimit(timeLimitSec * 1000);
+
+if (!fs.existsSync(modelPath)) {
+  console.error('Model not found: ' + modelPath);
+  console.error('Run bin/train first to generate a model.');
+  process.exit(1);
+}
+
+var modelData = JSON.parse(fs.readFileSync(modelPath, 'utf8'));
+var net       = NeuralNet.fromJSON(modelData);
+var agent     = new Agent(net);
+
+console.log('Snake AI - Evaluation');
+console.log('---------------------');
+console.log('Model:      ' + modelPath);
+console.log('Games:      ' + numGames);
+console.log('Time limit: ' + timeLimitSec + 's');
+console.log('');
+
+if (watchMode) {
+  watchGame(agent);
+} else {
+  runEvaluation(agent, numGames);
+}
+
+function runEvaluation(agent, numGames) {
+  var game       = new HeadlessGame();
+  var scores     = [];
+  var stepCounts = [];
+
+  for (var i = 0; i < numGames; i++) {
+    var result = agent.play(game);
+    scores.push(result.score);
+    stepCounts.push(result.steps);
+  }
+
+  scores.sort(function(a, b) { return b - a; });
+
+  var maxScore = scores[0];
+  var minScore = scores[scores.length - 1];
+  var avgScore = (scores.reduce(function(a, b) { return a + b; }, 0) / numGames).toFixed(1);
+  var avgSteps = (stepCounts.reduce(function(a, b) { return a + b; }, 0) / numGames).toFixed(0);
+  var median   = scores[Math.floor(scores.length / 2)];
+
+  console.log('Results:');
+  console.log('  Max Score:    ' + maxScore);
+  console.log('  Avg Score:    ' + avgScore);
+  console.log('  Median Score: ' + median);
+  console.log('  Min Score:    ' + minScore);
+  console.log('  Avg Steps:    ' + avgSteps);
+  console.log('');
+  console.log('Score distribution:');
+
+  var buckets = {};
+  for (var i = 0; i < scores.length; i++) {
+    buckets[scores[i]] = (buckets[scores[i]] || 0) + 1;
+  }
+
+  var sortedKeys = Object.keys(buckets).map(Number).sort(function(a, b) { return a - b; });
+  for (var i = 0; i < sortedKeys.length; i++) {
+    var k     = sortedKeys[i];
+    var count = buckets[k];
+    var bar   = '';
+    for (var j = 0; j < count; j++) bar += '█';
+    console.log('  ' + pad(k, 3) + ': ' + bar + ' (' + count + ')');
+  }
+}
+
+function watchGame(agent) {
+  var game = new HeadlessGame();
+  game.reset();
+
+  var frames = [];
+  while (game.alive) {
+    frames.push(captureFrame(game));
+    var dir = agent.decide(game);
+    game.step(dir);
+  }
+  frames.push(captureFrame(game));
+
+  var frameIdx = 0;
+  var interval = setInterval(function() {
+    process.stdout.write('\x1B[2J\x1B[H');
+    process.stdout.write(frames[frameIdx]);
+    process.stdout.write('\nScore: ' + game.score + '  Step: ' + (frameIdx + 1) + '/' + frames.length);
+    frameIdx++;
+    if (frameIdx >= frames.length) {
+      clearInterval(interval);
+      console.log('\n\nGame over! Final score: ' + game.score);
+    }
+  }, 50);
+}
+
+function captureFrame(game) {
+  var top    = '┌' + repeat('──', game.width) + '┐\n';
+  var bottom = '└' + repeat('──', game.width) + '┘\n';
+  var lines  = top;
+
+  for (var y = 0; y < game.height; y++) {
+    var row = '│';
+    for (var x = 0; x < game.width; x++) {
+      var cell = game.board[y][x];
+      if (cell === HeadlessGame.SNAKE) {
+        if (game.snake[0].y === y && game.snake[0].x === x) {
+          row += '◆ ';
+        } else {
+          row += '██';
+        }
+      } else if (cell === HeadlessGame.FOOD) {
+        row += '★ ';
+      } else {
+        row += '  ';
+      }
+    }
+    lines += row + '│\n';
+  }
+
+  return lines + bottom;
+}
+
+function repeat(str, n) {
+  var result = '';
+  for (var i = 0; i < n; i++) result += str;
+  return result;
+}
+
+function pad(val, width) {
+  var s = String(val);
+  while (s.length < width) s = ' ' + s;
+  return s;
+}
+
+function parseArgs(argv) {
+  var result = {};
+  for (var i = 0; i < argv.length; i++) {
+    if (argv[i].indexOf('--') === 0) {
+      var key = argv[i].slice(2);
+      var val = argv[i + 1] && argv[i + 1].indexOf('--') !== 0 ? argv[++i] : true;
+      result[key] = val;
+    } else if (argv[i].indexOf('-') === 0 && argv[i].length === 2) {
+      var k = argv[i].slice(1);
+      var v = argv[i + 1] && argv[i + 1].indexOf('-') !== 0 ? argv[++i] : true;
+      result[k] = v;
+    }
+  }
+  return result;
+}

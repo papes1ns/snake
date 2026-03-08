@@ -3,7 +3,8 @@ define(function(require) {
       Constants = require("snake/constants"),
       Snake     = require("snake/snake"),
       scoreNode = document.getElementById("score"),
-      rateNode  = document.getElementById("rate");
+      rateNode  = document.getElementById("rate"),
+      timerNode = document.getElementById("timer");
 
   function Game() {
     this.snake = new Snake();
@@ -12,6 +13,10 @@ define(function(require) {
     this.state = Constants.GAME_STATE_PLAYING;
     this.score = 0;
     this.directionKeyRegistered = false;
+    this.ticksWithoutFood = 0;
+    this.startedAt = null;
+    this.timerInterval = null;
+    this.tickTimeout = null;
   };
 
   Game.prototype.start = function() {
@@ -20,11 +25,39 @@ define(function(require) {
     rateNode.innerHTML = this.nodeRate();
     this.spawnSnake();
     this.generateFood();
+    this.startedAt = Date.now();
+    this.startTimer();
     this.tick();
   };
 
   Game.prototype.nodeRate = function() {
     return (1000 / this.tickInterval()).toFixed(2);
+  };
+
+  Game.prototype.startTimer = function() {
+    var that = this;
+    var limit = Constants.GAME_TIME_LIMIT;
+    that.updateTimer();
+    this.timerInterval = setInterval(function() {
+      if (that.state === Constants.GAME_STATE_DONE) {
+        clearInterval(that.timerInterval);
+        that.timerInterval = null;
+        return;
+      }
+      that.updateTimer();
+      var elapsed = (Date.now() - that.startedAt) / 1000;
+      if (elapsed >= limit) {
+        that.state = Constants.GAME_STATE_DONE;
+        that.updateTimer();
+      }
+    }, 100);
+  };
+
+  Game.prototype.updateTimer = function() {
+    if (!timerNode) return;
+    var elapsed = (Date.now() - this.startedAt) / 1000;
+    var remaining = Math.max(0, Constants.GAME_TIME_LIMIT - elapsed);
+    timerNode.innerHTML = remaining.toFixed(1);
   };
 
   Game.prototype.spawnSnake = function() {
@@ -49,7 +82,9 @@ define(function(require) {
   Game.prototype.tick = function() {
     var that = this;
 
-    setTimeout(function() {
+    this.tickTimeout = setTimeout(function() {
+      that.tickTimeout = null;
+
       if (that.state == Constants.GAME_STATE_PAUSED ||
           that.state == Constants.GAME_STATE_DONE) {
         return;
@@ -57,13 +92,18 @@ define(function(require) {
 
       that.moveOne();
 
-      that.tick();
+      if (that.state === Constants.GAME_STATE_PLAYING) {
+        that.tick();
+      }
     }, this.tickInterval());
   };
 
 
+  // Arcade-style bit-shift speed: base >> (score >> divisor)
+  // Logarithmic ramp — never negative, doubles speed every 2^divisor points
   Game.prototype.tickInterval = function() {
-    return Constants.TICK_INTERVAL - (this.score * Constants.TICK_FASTER_MULTIPLYER);
+    var shift = this.score >> Constants.TICK_SPEED_DIVISOR;
+    return Math.max(Constants.TICK_BASE_INTERVAL >> shift, Constants.TICK_MIN_INTERVAL);
   };
 
   Game.prototype.moveOne = function() {
@@ -87,7 +127,6 @@ define(function(require) {
                     this.snake.pieces[0].piece.positionX - 1];
         break;
       };
-      this.directionKeyRegistered = false;
 
       y = position[0];
       x = position[1];
@@ -111,8 +150,11 @@ define(function(require) {
         console.log("yummy!");
         this.generateFood();
         this.score++;
+        this.ticksWithoutFood = 0;
         scoreNode.innerHTML = this.score;
         rateNode.innerHTML = this.nodeRate();
+      } else {
+        this.ticksWithoutFood++;
       };
 
       head.className = "snake";
@@ -128,6 +170,15 @@ define(function(require) {
           Constants.GAME_EMPTY_PIECE
         );
       };
+
+      var hungerLimit = Constants.HUNGER_BASE + this.snake.pieces.length * Constants.HUNGER_PER_SEGMENT;
+      if (this.ticksWithoutFood > hungerLimit) {
+        console.log("starved after " + this.ticksWithoutFood + " ticks without food");
+        this.state = Constants.GAME_STATE_DONE;
+        return;
+      };
+
+      this.directionKeyRegistered = false;
 
   };
 
@@ -171,11 +222,23 @@ define(function(require) {
     }
     else if (this.state == Constants.GAME_STATE_PLAYING) {
       this.state = Constants.GAME_STATE_PAUSED;
+      if (this.tickTimeout) {
+        clearTimeout(this.tickTimeout);
+        this.tickTimeout = null;
+      }
     };
   };
 
   Game.prototype.stop = function() {
     this.state = Constants.GAME_STATE_DONE;
+    if (this.tickTimeout) {
+      clearTimeout(this.tickTimeout);
+      this.tickTimeout = null;
+    }
+    if (this.timerInterval) {
+      clearInterval(this.timerInterval);
+      this.timerInterval = null;
+    }
   };
 
   return Game;
