@@ -116,6 +116,7 @@ define(function(require) {
       if (self.active && self.game.state === Constants.GAME_STATE_PLAYING) {
         var vision  = getVision(self.game);
         var outputs = self.net.forward(vision);
+        console.log(outputs);
         var bestIdx = 0;
         for (var i = 1; i < outputs.length; i++) {
           if (outputs[i] > outputs[bestIdx]) bestIdx = i;
