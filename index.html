@@ -3,106 +3,150 @@
   <head>
     <title>Snake</title>
     <style>
-      .collision {
-        background-color: red;
-      }
-      .snake {
-        background-color: black;
-      }
-      .food {
-        background-color: green;
-      }
-      #main > table {
-        box-sizing: border-box;
-        border-collapse: collapse;
-        border: 1px solid #ddd;
-      }
-      #main > table td {
+      html, body {
         margin: 0;
         padding: 0;
-        width: 1em;
-        height: 1em;
-        border: none;
-      }
-
-      #game-wrapper {
-        display: flex;
-        align-items: flex-start;
-        gap: 20px;
-      }
-
-      #ai-debug {
-        width: 360px;
-        background: #1a1a2e;
+        height: 100vh;
+        overflow: hidden;
+        background: #0f0f23;
         color: #e0e0e0;
-        padding: 14px;
-        border-radius: 8px;
         font-family: 'Courier New', monospace;
-        font-size: 12px;
-        line-height: 1.4;
-      }
-      #ai-debug h3 {
-        margin: 0 0 10px;
-        color: #00ff88;
-        font-size: 15px;
-      }
-      #ai-debug h4 {
-        margin: 12px 0 5px;
-        color: #88aaff;
-        font-size: 13px;
-        border-bottom: 1px solid #333;
-        padding-bottom: 3px;
       }
 
-      #debug-speed {
-        margin-bottom: 10px;
-        padding: 8px;
-        background: #16213e;
-        border-radius: 4px;
+      #header {
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 18px;
+        padding: 8px 16px;
+        background: #16213e;
+        border-bottom: 1px solid #333;
+        font-size: 14px;
+        flex-wrap: wrap;
       }
-      #speed-slider { width: 100px; vertical-align: middle; cursor: pointer; }
-      #speed-label { color: #ffcc00; font-weight: bold; min-width: 65px; }
-      #step-btn {
-        padding: 3px 12px;
+      #header .title {
+        font-size: 20px;
+        font-weight: bold;
+        color: #00ff88;
+        margin-right: 6px;
+      }
+      #header .stat { color: #ccc; }
+      #header .stat span { color: #ffcc00; font-weight: bold; }
+      #header button {
+        padding: 4px 14px;
         cursor: pointer;
         background: #335;
         color: #aaccff;
         border: 1px solid #557;
         border-radius: 3px;
         font-family: 'Courier New', monospace;
+        font-size: 13px;
+      }
+      #header button:hover { background: #446; }
+      #ai-toggle.active {
+        background: #2a5d3a;
+        color: #00ff88;
+        border-color: #3a7d4a;
+      }
+      #ai-status { color: #88aaff; font-size: 13px; }
+
+      #main > table {
+        box-sizing: border-box;
+        border-collapse: collapse;
+        border: 1px solid #333;
+      }
+      #main > table td {
+        margin: 0;
+        padding: 0;
+        width: 14px;
+        height: 14px;
+        border: none;
+        background: #1a1a2e;
+      }
+      #main > table td.snake { background-color: #cccccc; }
+      #main > table td.food { background-color: #00cc44; }
+      #main > table td.collision { background-color: red; }
+
+      #game-wrapper {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 12px 16px;
+      }
+
+      #ai-debug {
+        display: none;
+        gap: 12px;
+        align-items: flex-start;
+        flex: 1;
+        min-width: 0;
+      }
+
+      .dbg-col {
+        background: #1a1a2e;
+        border: 1px solid #333;
+        border-radius: 8px;
+        padding: 10px;
+        max-height: calc(100vh - 80px);
+        overflow-y: auto;
         font-size: 12px;
+        line-height: 1.4;
+      }
+      .dbg-col h4 {
+        margin: 0 0 6px;
+        color: #88aaff;
+        font-size: 12px;
+        border-bottom: 1px solid #333;
+        padding-bottom: 3px;
+      }
+      .dbg-col h4 + h4 { margin-top: 10px; }
+
+      #debug-speed {
+        margin-bottom: 8px;
+        padding: 6px 8px;
+        background: #16213e;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+      }
+      #speed-slider { width: 80px; vertical-align: middle; cursor: pointer; }
+      #speed-label { color: #ffcc00; font-weight: bold; min-width: 50px; font-size: 11px; }
+      #step-btn {
+        padding: 2px 10px;
+        cursor: pointer;
+        background: #335;
+        color: #aaccff;
+        border: 1px solid #557;
+        border-radius: 3px;
+        font-family: 'Courier New', monospace;
+        font-size: 11px;
       }
       #step-btn:hover { background: #446; }
 
       #vision-table {
         border-collapse: collapse;
         width: 100%;
-        margin-bottom: 4px;
       }
       #vision-table th,
       #vision-table td {
-        padding: 2px 5px;
+        padding: 2px 4px;
         text-align: center;
         border: 1px solid #333;
-        font-size: 11px;
+        font-size: 10px;
       }
       #vision-table th {
         background: #16213e;
         color: #88aaff;
       }
-      #vision-table td {
-        min-width: 36px;
-      }
+      #vision-table td { min-width: 30px; }
 
       #network-viz {
         display: flex;
-        justify-content: space-between;
+        justify-content: center;
         align-items: center;
-        gap: 6px;
-        padding: 6px 0;
+        gap: 4px;
+        padding: 4px 0;
       }
       .net-layer {
         display: flex;
@@ -111,10 +155,11 @@
         gap: 1px;
       }
       .net-layer-label {
-        font-size: 9px;
+        font-size: 8px;
         color: #777;
-        margin-bottom: 3px;
+        margin-bottom: 2px;
         text-align: center;
+        white-space: nowrap;
       }
       .neuron {
         width: 10px;
@@ -136,11 +181,12 @@
         margin: 3px 0;
       }
       .decision-label {
-        width: 18px;
+        width: 16px;
         text-align: right;
-        margin-right: 6px;
+        margin-right: 5px;
         font-weight: bold;
         color: #999;
+        font-size: 11px;
       }
       .decision-bar-bg {
         flex: 1;
@@ -156,10 +202,10 @@
         transition: width 0.08s;
       }
       .decision-val {
-        width: 52px;
+        width: 48px;
         text-align: right;
-        margin-left: 6px;
-        font-size: 11px;
+        margin-left: 5px;
+        font-size: 10px;
         color: #aaa;
       }
       .decision-row.chosen .decision-label { color: #4488ff; }
@@ -167,7 +213,7 @@
       .decision-row.chosen .decision-val { color: #4488ff; }
 
       #hunger-bar {
-        height: 8px;
+        height: 6px;
         background: #16213e;
         border-radius: 3px;
         overflow: hidden;
@@ -180,48 +226,48 @@
         transition: width 0.1s;
       }
 
-      .dbg-row { margin: 3px 0; }
+      .dbg-row { margin: 2px 0; font-size: 11px; }
       .dbg-row span { color: #ccc; }
     </style>
   </head>
   <body>
-    <h1>Snake</h1>
-    <h2>Score: <span id="score"></span></h2>
-    <h2>Rate: <span id="rate"></span> nodes per second</h2>
-    <h2>Time: <span id="timer"></span>s</h2>
-    <button id="new-game">New Game</button>
-    <button id="ai-play">AI Play</button>
-    <span id="ai-status"></span>
-    </br>
-    </br>
+    <div id="header">
+      <span class="title">Snake</span>
+      <span class="stat">Score: <span id="score">0</span></span>
+      <span class="stat">Rate: <span id="rate">0</span>/s</span>
+      <span class="stat">Time: <span id="timer">0</span>s</span>
+      <button id="new-game">New Game</button>
+      <button id="ai-toggle">AI: OFF</button>
+      <span id="ai-status"></span>
+    </div>
     <div id="game-wrapper">
       <div id="main"></div>
       <div id="ai-debug" style="display:none">
-        <h3>AI Debug Panel</h3>
-
-        <div id="debug-speed">
-          <span>Speed:</span>
-          <input type="range" id="speed-slider" min="0" max="2" value="2">
-          <span id="speed-label">Normal</span>
-          <button id="step-btn" style="display:none">Step</button>
+        <div class="dbg-col" id="col-vision">
+          <h4>Vision Inputs</h4>
+          <div id="vision-container"></div>
         </div>
-
-        <h4>Vision Inputs</h4>
-        <div id="vision-container"></div>
-
-        <h4>Network Layers [24 &rarr; 18 &rarr; 18 &rarr; 4]</h4>
-        <div id="network-viz"></div>
-
-        <h4>Decision Output</h4>
-        <div id="decision-bars"></div>
-        <div class="dbg-row">Chosen: <span id="chosen-dir" style="color:#4488ff;font-weight:bold">-</span></div>
-
-        <h4>Fitness &amp; State</h4>
-        <div class="dbg-row">Score: <span id="dbg-score">0</span> &nbsp; Steps: <span id="dbg-steps">0</span></div>
-        <div class="dbg-row">Fitness: <span id="dbg-fitness" style="color:#00ff88">0</span></div>
-        <div class="dbg-row">Speed: <span id="dbg-speed">0</span> nodes/sec</div>
-        <div class="dbg-row">Hunger: <span id="dbg-hunger">0</span> / <span id="dbg-hunger-limit">120</span></div>
-        <div id="hunger-bar"><div id="hunger-fill"></div></div>
+        <div class="dbg-col" id="col-network">
+          <h4>Network [24&rarr;18&rarr;18&rarr;4]</h4>
+          <div id="network-viz"></div>
+        </div>
+        <div class="dbg-col" id="col-decision">
+          <div id="debug-speed">
+            <span>Speed:</span>
+            <input type="range" id="speed-slider" min="0" max="2" value="2">
+            <span id="speed-label">Normal</span>
+            <button id="step-btn" style="display:none">Step</button>
+          </div>
+          <h4>Decision Output</h4>
+          <div id="decision-bars"></div>
+          <div class="dbg-row">Chosen: <span id="chosen-dir" style="color:#4488ff;font-weight:bold">-</span></div>
+          <h4>Fitness &amp; State</h4>
+          <div class="dbg-row">Score: <span id="dbg-score">0</span> &nbsp; Steps: <span id="dbg-steps">0</span></div>
+          <div class="dbg-row">Fitness: <span id="dbg-fitness" style="color:#00ff88">0</span></div>
+          <div class="dbg-row">Speed: <span id="dbg-speed">0</span> nodes/sec</div>
+          <div class="dbg-row">Hunger: <span id="dbg-hunger">0</span> / <span id="dbg-hunger-limit">120</span></div>
+          <div id="hunger-bar"><div id="hunger-fill"></div></div>
+        </div>
       </div>
     </div>
     <script data-main="scripts/main.js" src="scripts/lib/require.js"></script>

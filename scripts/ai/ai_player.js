@@ -22,7 +22,7 @@ define(function(require) {
   var DIR_NAMES  = ['N', 'E', 'S', 'W'];
   var RAY_NAMES  = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
   var SIG_NAMES  = ['Wall', 'Food', 'Body'];
-  var LAYER_NAMES = ['Input (24)', 'Hidden 1 (18)', 'Hidden 2 (18)', 'Output (4)'];
+  var LAYER_NAMES = ['In (24)', 'H1 (18)', 'H2 (18)', 'Out (4)'];
   var LAYER_SIZES = [24, 18, 18, 4];
   var SPEED_LABELS = ['Paused', 'Slow (3s)', 'Normal'];
 
@@ -345,7 +345,7 @@ define(function(require) {
     this.active    = false;
     this.steps     = 0;
     this._pausedAt = null;
-    this._pauseElapsed = 0;
+    this._virtualElapsed = 0;
   }
 
   AIPlayer.prototype.start = function() {
@@ -354,10 +354,17 @@ define(function(require) {
     this.steps  = 0;
 
     buildDebugDOM();
-    debugPanel.style.display = 'block';
+    debugPanel.style.display = 'flex';
     speedSlider.value = '2';
     speedLabel.textContent = 'Normal';
     stepBtn.style.display = 'none';
+
+    // Stop real-time timer; virtual time is advanced per-tick instead
+    if (this.game.timerInterval) {
+      clearInterval(this.game.timerInterval);
+      this.game.timerInterval = null;
+    }
+    this._virtualElapsed = Date.now() - this.game.startedAt;
 
     var originalMoveOne      = this.game.moveOne;
     var originalTick         = this.game.tick;
@@ -377,6 +384,15 @@ define(function(require) {
         renderDebugPanel(vision, debugData, bestIdx, self.game, self.steps);
       }
       originalMoveOne.call(self.game);
+      if (self.active && self.game.state === Constants.GAME_STATE_PLAYING) {
+        self._virtualElapsed += originalTickInterval.call(self.game);
+        self.game.startedAt = Date.now() - self._virtualElapsed;
+        self.game.updateTimer();
+        if (self._virtualElapsed / 1000 >= Constants.GAME_TIME_LIMIT) {
+          self.game.state = Constants.GAME_STATE_DONE;
+          self.game.updateTimer();
+        }
+      }
     };
 
     // Monkey-patch tick: speed slider controls timing
@@ -386,6 +402,9 @@ define(function(require) {
 
       if (sliderVal === 0) {
         stepBtn.style.display = 'inline-block';
+        if (!self._pausedAt) {
+          self._pausedAt = Date.now();
+        }
         return;
       }
 
@@ -419,21 +438,15 @@ define(function(require) {
       if (val === 0) {
         stepBtn.style.display = 'inline-block';
         self._pausedAt = Date.now();
-        self._pauseElapsed = Date.now() - self.game.startedAt;
         if (self.game.tickTimeout) {
           clearTimeout(self.game.tickTimeout);
           self.game.tickTimeout = null;
         }
-        if (self.game.timerInterval) {
-          clearInterval(self.game.timerInterval);
-          self.game.timerInterval = null;
-        }
       } else {
         stepBtn.style.display = 'none';
         if (self._pausedAt) {
-          self.game.startedAt = Date.now() - self._pauseElapsed;
+          self.game.startedAt = Date.now() - self._virtualElapsed;
           self._pausedAt = null;
-          self.game.startTimer();
         }
         if (self.game.state === Constants.GAME_STATE_PLAYING && !self.game.tickTimeout) {
           self.game.tick();
@@ -444,8 +457,29 @@ define(function(require) {
 
   AIPlayer.prototype.stop = function() {
     this.active = false;
-    this._pausedAt = null;
     debugPanel.style.display = 'none';
+    this._pausedAt = null;
+
+    // Restore startedAt from virtual elapsed so real timer picks up correctly
+    this.game.startedAt = Date.now() - this._virtualElapsed;
+
+    speedSlider.value = '2';
+    speedLabel.textContent = 'Normal';
+    stepBtn.style.display = 'none';
+
+    // Remove monkey-patched instance methods, revealing prototype originals
+    delete this.game.moveOne;
+    delete this.game.tick;
+
+    // Restart real-time timer and tick chain if game is still playing
+    if (this.game.state === Constants.GAME_STATE_PLAYING) {
+      if (!this.game.timerInterval) {
+        this.game.startTimer();
+      }
+      if (!this.game.tickTimeout) {
+        this.game.tick();
+      }
+    }
   };
 
   return AIPlayer;
