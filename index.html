@@ -24,6 +24,164 @@
         height: 1em;
         border: none;
       }
+
+      #game-wrapper {
+        display: flex;
+        align-items: flex-start;
+        gap: 20px;
+      }
+
+      #ai-debug {
+        width: 360px;
+        background: #1a1a2e;
+        color: #e0e0e0;
+        padding: 14px;
+        border-radius: 8px;
+        font-family: 'Courier New', monospace;
+        font-size: 12px;
+        line-height: 1.4;
+      }
+      #ai-debug h3 {
+        margin: 0 0 10px;
+        color: #00ff88;
+        font-size: 15px;
+      }
+      #ai-debug h4 {
+        margin: 12px 0 5px;
+        color: #88aaff;
+        font-size: 13px;
+        border-bottom: 1px solid #333;
+        padding-bottom: 3px;
+      }
+
+      #debug-speed {
+        margin-bottom: 10px;
+        padding: 8px;
+        background: #16213e;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      #speed-slider { width: 100px; vertical-align: middle; cursor: pointer; }
+      #speed-label { color: #ffcc00; font-weight: bold; min-width: 65px; }
+      #step-btn {
+        padding: 3px 12px;
+        cursor: pointer;
+        background: #335;
+        color: #aaccff;
+        border: 1px solid #557;
+        border-radius: 3px;
+        font-family: 'Courier New', monospace;
+        font-size: 12px;
+      }
+      #step-btn:hover { background: #446; }
+
+      #vision-table {
+        border-collapse: collapse;
+        width: 100%;
+        margin-bottom: 4px;
+      }
+      #vision-table th,
+      #vision-table td {
+        padding: 2px 5px;
+        text-align: center;
+        border: 1px solid #333;
+        font-size: 11px;
+      }
+      #vision-table th {
+        background: #16213e;
+        color: #88aaff;
+      }
+      #vision-table td {
+        min-width: 36px;
+      }
+
+      #network-viz {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 0;
+      }
+      .net-layer {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1px;
+      }
+      .net-layer-label {
+        font-size: 9px;
+        color: #777;
+        margin-bottom: 3px;
+        text-align: center;
+      }
+      .neuron {
+        width: 10px;
+        height: 10px;
+        border: 1px solid #333;
+        border-radius: 2px;
+        background: #111;
+      }
+      .neuron.winner {
+        border: 2px solid #4488ff;
+        box-shadow: 0 0 4px #4488ff;
+        width: 9px;
+        height: 9px;
+      }
+
+      .decision-row {
+        display: flex;
+        align-items: center;
+        margin: 3px 0;
+      }
+      .decision-label {
+        width: 18px;
+        text-align: right;
+        margin-right: 6px;
+        font-weight: bold;
+        color: #999;
+      }
+      .decision-bar-bg {
+        flex: 1;
+        height: 14px;
+        background: #16213e;
+        border-radius: 3px;
+        overflow: hidden;
+      }
+      .decision-bar-fill {
+        height: 100%;
+        border-radius: 3px;
+        background: #44aa66;
+        transition: width 0.08s;
+      }
+      .decision-val {
+        width: 52px;
+        text-align: right;
+        margin-left: 6px;
+        font-size: 11px;
+        color: #aaa;
+      }
+      .decision-row.chosen .decision-label { color: #4488ff; }
+      .decision-row.chosen .decision-bar-fill { background: #4488ff !important; }
+      .decision-row.chosen .decision-val { color: #4488ff; }
+
+      #hunger-bar {
+        height: 8px;
+        background: #16213e;
+        border-radius: 3px;
+        overflow: hidden;
+        margin-top: 3px;
+      }
+      #hunger-fill {
+        height: 100%;
+        background: #ffaa22;
+        border-radius: 3px;
+        transition: width 0.1s;
+      }
+
+      .dbg-row { margin: 3px 0; }
+      .dbg-row span { color: #ccc; }
     </style>
   </head>
   <body>
@@ -36,7 +194,36 @@
     <span id="ai-status"></span>
     </br>
     </br>
-    <div id="main"></div>
+    <div id="game-wrapper">
+      <div id="main"></div>
+      <div id="ai-debug" style="display:none">
+        <h3>AI Debug Panel</h3>
+
+        <div id="debug-speed">
+          <span>Speed:</span>
+          <input type="range" id="speed-slider" min="0" max="2" value="2">
+          <span id="speed-label">Normal</span>
+          <button id="step-btn" style="display:none">Step</button>
+        </div>
+
+        <h4>Vision Inputs</h4>
+        <div id="vision-container"></div>
+
+        <h4>Network Layers [24 &rarr; 18 &rarr; 18 &rarr; 4]</h4>
+        <div id="network-viz"></div>
+
+        <h4>Decision Output</h4>
+        <div id="decision-bars"></div>
+        <div class="dbg-row">Chosen: <span id="chosen-dir" style="color:#4488ff;font-weight:bold">-</span></div>
+
+        <h4>Fitness &amp; State</h4>
+        <div class="dbg-row">Score: <span id="dbg-score">0</span> &nbsp; Steps: <span id="dbg-steps">0</span></div>
+        <div class="dbg-row">Fitness: <span id="dbg-fitness" style="color:#00ff88">0</span></div>
+        <div class="dbg-row">Speed: <span id="dbg-speed">0</span> nodes/sec</div>
+        <div class="dbg-row">Hunger: <span id="dbg-hunger">0</span> / <span id="dbg-hunger-limit">120</span></div>
+        <div id="hunger-bar"><div id="hunger-fill"></div></div>
+      </div>
+    </div>
     <script data-main="scripts/main.js" src="scripts/lib/require.js"></script>
   </body>
 </html>
