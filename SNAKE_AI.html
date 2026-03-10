@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teaching a Neural Network to Play Snake</title>
+</head>
+<body>
+
+<h1>Teaching a Neural Network to Play Snake</h1>
+
+<h3>Article summary</h3>
+<ul>
+  <li>Why Snake is a useful AI testbed</li>
+  <li>Feedforward neural net implementation in plain JavaScript</li>
+  <li>Training with a genetic algorithm: fitness, crossover, mutation</li>
+  <li>Running inference in the browser</li>
+  <li>A live debugger for watching the AI think</li>
+  <li>Tips for building your own training and inference pipelines</li>
+</ul>
+
+<hr>
+
+<h2>1. Intro to Artificial Intelligence by Example</h2>
+
+<p>
+  When people hear "AI" they tend to picture something opaque and complicated.
+  In practice, most AI is pattern recognition. You give a system a set of
+  inputs, it produces an output, and a training process adjusts internal
+  parameters until the outputs become useful.
+</p>
+
+<p>
+  This post walks through a complete, working example of that process. The
+  subject is the classic game of Snake. The AI technique is
+  <strong>neuroevolution</strong>: a population of small neural networks that
+  evolve over generations, getting better at the game through selection pressure
+  alone. No labeled training data. No gradient descent. Just evolution in code.
+</p>
+
+<p>
+  Everything described here is implemented in a single JavaScript codebase. The
+  neural net, the genetic algorithm, the game engine, and the browser-based
+  debugger are all readable, plain JS. My goal is to demystify what a neural
+  network actually does by showing you every moving part.
+</p>
+
+<hr>
+
+<h2>2. The Game of Snake</h2>
+
+<p>
+  Snake is a grid-based game with simple rules and emergent complexity. A snake
+  moves continuously on a 30&times;30 board. It eats food to grow longer.
+  Colliding with a wall or its own body ends the game.
+</p>
+
+<p>
+  What makes Snake interesting as an AI problem is that the optimal strategy
+  changes as the snake grows. Early on, the board is wide open. Later, the
+  snake's own body becomes the primary obstacle. An agent that only learned to
+  chase food in a straight line will eventually trap itself.
+</p>
+
+<h3>Game mechanics that shape training</h3>
+
+<p>
+  A few game parameters directly influence how the AI learns. These are defined
+  in <code>scripts/snake/constants.js</code> and mirrored in the headless
+  training engine:
+</p>
+
+<ul>
+  <li><strong>Speed ramp:</strong> The tick interval uses an arcade-style
+    bit-shift formula: <code>base &gt;&gt; (score &gt;&gt; divisor)</code>. The
+    game starts at 100ms per tick and doubles speed every 8 points. This means
+    higher scores are harder to achieve because the snake moves faster.</li>
+  <li><strong>Time limit:</strong> Each game is capped at 300 seconds of
+    virtual game time. Agents that stall or circle the edges will time out
+    before reaching high scores.</li>
+  <li><strong>Starvation:</strong> If the snake goes too many ticks without
+    eating, it dies. The hunger limit scales with body length:
+    <code>120 + snake.length * 3</code>. This prevents agents from learning to
+    just survive by looping endlessly.</li>
+</ul>
+
+<p>
+  Together, these mechanics apply evolutionary pressure toward agents that
+  actively seek food and do so quickly.
+</p>
+
+<hr>
+
+<h2>3. Neural Net Implementation</h2>
+
+<p>
+  Each agent's "brain" is a feedforward neural network with the architecture
+  <code>[24, 18, 18, 4]</code>: 24 input neurons, two hidden layers of 18
+  neurons each, and 4 output neurons (one per direction: North, East, South,
+  West). The agent moves in whichever direction has the highest output value.
+</p>
+
+<h3>Vision: what the snake sees</h3>
+
+<p>
+  The snake perceives the board through 8-directional raycasting. From the
+  head, rays are cast in all 8 compass directions (N, NE, E, SE, S, SW, W,
+  NW). Each ray reports three values:
+</p>
+
+<ol>
+  <li><code>1 / distance</code> to the nearest wall (closer walls produce
+    larger values)</li>
+  <li><code>1</code> if food is visible along this ray, <code>0</code>
+    otherwise</li>
+  <li><code>1</code> if the snake's own body is visible along this ray,
+    <code>0</code> otherwise</li>
+</ol>
+
+<p>
+  That gives 8 rays &times; 3 signals = 24 inputs. Here's the implementation
+  from <code>src/headless_game.js</code>:
+</p>
+
+<pre><code>HeadlessGame.prototype.getVision = function() {
+  var head = this.snake[0];
+  var inputs = [];
+
+  for (var r = 0; r &lt; RAY_DIRECTIONS.length; r++) {
+    var ray = RAY_DIRECTIONS[r];
+    var distance  = 0;
+    var foodFound = 0;
+    var bodyFound = 0;
+    var y = head.y;
+    var x = head.x;
+
+    while (true) {
+      y += ray.dy;
+      x += ray.dx;
+      distance++;
+
+      if (y &lt; 0 || y &gt;= this.height || x &lt; 0 || x &gt;= this.width) break;
+
+      if (this.board[y][x] === FOOD  &amp;&amp; !foodFound) foodFound = 1;
+      if (this.board[y][x] === SNAKE &amp;&amp; !bodyFound) bodyFound = 1;
+    }
+
+    inputs.push(1 / distance);
+    inputs.push(foodFound);
+    inputs.push(bodyFound);
+  }
+
+  return inputs;
+};</code></pre>
+
+<h3>Forward propagation</h3>
+
+<p>
+  The 24-element vision array feeds into the network. Each layer computes a
+  weighted sum of its inputs, adds a bias term, and applies an activation
+  function. Hidden layers use ReLU (<code>max(0, x)</code>). The output layer
+  uses raw linear values so the agent can compare magnitudes directly.
+</p>
+
+<p>
+  From <code>src/neural_net.js</code>:
+</p>
+
+<pre><code>NeuralNet.prototype.forward = function(inputs) {
+  var activation = inputs;
+
+  for (var i = 0; i &lt; this.weights.length; i++) {
+    var w = this.weights[i];
+    var b = this.biases[i];
+    var isOutput = (i === this.weights.length - 1);
+    var next = [];
+
+    for (var j = 0; j &lt; w.length; j++) {
+      var sum = b[j];
+      for (var k = 0; k &lt; activation.length; k++) {
+        sum += w[j][k] * activation[k];
+      }
+      next.push(isOutput ? sum : Math.max(0, sum));
+    }
+
+    activation = next;
+  }
+
+  return activation;
+};</code></pre>
+
+<p>
+  The math for a single neuron is: <code>output = activation(sum(w[i] * input[i]) + bias)</code>.
+  Multiply every input by its corresponding weight, sum them, add the bias,
+  then apply the activation function. That's it. A neural network is just this
+  operation repeated across layers.
+</p>
+
+<h3>Weight initialization</h3>
+
+<p>
+  Weights are initialized using He initialization, which scales random values
+  by <code>sqrt(2 / fan_in)</code>. This prevents signals from exploding or
+  vanishing as they pass through layers. Biases start at zero.
+</p>
+
+<pre><code>function randomMatrix(rows, cols) {
+  var scale = Math.sqrt(2 / cols);
+  var m = [];
+  for (var r = 0; r &lt; rows; r++) {
+    m[r] = [];
+    for (var c = 0; c &lt; cols; c++) {
+      m[r][c] = (Math.random() * 2 - 1) * scale;
+    }
+  }
+  return m;
+}</code></pre>
+
+<h3>Parameter count</h3>
+
+<p>
+  This network has <code>(24*18 + 18) + (18*18 + 18) + (18*4 + 4) = 850</code>
+  total parameters (weights + biases). That's small enough to serialize as a
+  flat JSON array and large enough to encode useful Snake strategies.
+</p>
+
+<hr>
+
+<h2>4. Training: Reward Functions, Weights, and Bias</h2>
+
+<p>
+  Training uses a genetic algorithm. There is no backpropagation. Instead, a
+  population of 1,000 neural networks plays the game, and the best performers
+  reproduce to create the next generation.
+</p>
+
+<h3>Architecture overview</h3>
+
+<pre><code>
+    Training Pipeline
+    =================
+
+    [Random Population]         1,000 neural nets with random weights
+            |
+            v
+    [Evaluate]                  Each net plays 8 games, fitness is averaged
+            |                       (parallelized across N worker processes)
+            v
+    [Rank by Fitness]           Sort population by fitness score
+            |
+            v
+    [Elitism]                   Top 5% survive unchanged into next generation
+            |
+            v
+    [Tournament Selection]      Pick 5 random candidates, keep the fittest
+            |
+            v
+    [Single-Point Crossover]    Combine two parents at a random splice point
+            |
+            v
+    [Gaussian Mutation]         5% chance per weight, scale 0.3
+            |
+            v
+    [Next Generation]           Repeat for N generations
+            |
+            v
+    [Save best.json]            Best network serialized to disk after each gen
+</code></pre>
+
+<h3>The fitness function</h3>
+
+<p>
+  The fitness function is the single most important design decision. It defines
+  what "good" means. Getting it wrong will train an agent that optimizes for
+  the wrong thing.
+</p>
+
+<p>
+  From <code>src/genetic.js</code>:
+</p>
+
+<pre><code>GeneticAlgorithm.prototype.fitness = function(score, steps) {
+  return score * score * 5000 + steps;
+};</code></pre>
+
+<p>
+  The quadratic term (<code>score * score * 5000</code>) makes each additional
+  food consumed dramatically more valuable than the last. An agent that scores
+  5 gets 125,000 fitness from score alone, while an agent that scores 10 gets
+  500,000. This strongly incentivizes food-seeking over passive survival.
+</p>
+
+<p>
+  The linear <code>+ steps</code> term is a tiebreaker. Among agents with the
+  same score, the one that survived longer (and therefore had more chances to
+  eat) ranks higher. For score-zero agents in early generations, this term is
+  the only selection signal: survive longer to get more chances.
+</p>
+
+<p>
+  An earlier version of this function capped score at 10 with
+  <code>Math.min(score, 10)</code>, which caused the population to plateau.
+  Removing the cap was the single biggest training improvement.
+</p>
+
+<h3>Tournament selection</h3>
+
+<p>
+  To choose a parent, the algorithm picks 5 random individuals from the ranked
+  population and selects the one with the highest fitness. This balances
+  exploitation (the best agents reproduce more) with exploration (weaker agents
+  still have a chance).
+</p>
+
+<pre><code>GeneticAlgorithm.prototype.select = function(results) {
+  var best = null;
+  for (var i = 0; i &lt; this.tournamentSize; i++) {
+    var idx = Math.floor(Math.random() * results.length);
+    if (!best || results[idx].fitness &gt; best.fitness) {
+      best = results[idx];
+    }
+  }
+  return best.net;
+};</code></pre>
+
+<h3>Crossover</h3>
+
+<p>
+  Two parents produce a child by flattening their weights into a single array
+  and splicing at a random point. Everything before the splice comes from
+  parent 1; everything after comes from parent 2.
+</p>
+
+<pre><code>GeneticAlgorithm.prototype.crossover = function(parent1, parent2) {
+  var child = new NeuralNet(this.layers);
+  var w1 = parent1.getWeightsFlat();
+  var w2 = parent2.getWeightsFlat();
+  var childWeights = [];
+
+  var crossPoint = Math.floor(Math.random() * w1.length);
+  for (var i = 0; i &lt; w1.length; i++) {
+    childWeights.push(i &lt; crossPoint ? w1[i] : w2[i]);
+  }
+
+  child.setWeightsFlat(childWeights);
+  return child;
+};</code></pre>
+
+<h3>Mutation</h3>
+
+<p>
+  After crossover, each weight has a 5% chance of being nudged by a Gaussian
+  random value scaled by 0.3. This introduces small variations that let the
+  population explore nearby regions of the weight space.
+</p>
+
+<pre><code>GeneticAlgorithm.prototype.mutate = function(net) {
+  var weights = net.getWeightsFlat();
+  for (var i = 0; i &lt; weights.length; i++) {
+    if (Math.random() &lt; this.mutationRate) {
+      weights[i] += gaussianRandom() * this.mutationScale;
+    }
+  }
+  net.setWeightsFlat(weights);
+};</code></pre>
+
+<h3>Parallel evaluation</h3>
+
+<p>
+  Evaluating 1,000 networks across 8 games each is the training bottleneck.
+  The <code>bin/train</code> CLI distributes the population across worker
+  processes using Node.js <code>child_process.fork()</code>. Each worker
+  receives a batch of serialized networks, evaluates them against the headless
+  game engine, and returns fitness scores. The master process then runs
+  selection, crossover, and mutation.
+</p>
+
+<pre><code>// src/worker.js
+function fitness(score, steps) {
+  return score * score * 5000 + steps;
+}
+
+process.on('message', function(msg) {
+  if (msg.type === 'evaluate') {
+    var batch        = msg.batch;
+    var gamesPerEval = msg.gamesPerEval;
+    var game         = new HeadlessGame();
+    var results      = [];
+
+    for (var i = 0; i &lt; batch.length; i++) {
+      var net   = NeuralNet.fromJSON(batch[i]);
+      var agent = new Agent(net);
+      var totalFitness = 0;
+      var bestScore    = 0;
+
+      for (var g = 0; g &lt; gamesPerEval; g++) {
+        var result = agent.play(game);
+        totalFitness += fitness(result.score, result.steps);
+        if (result.score &gt; bestScore) bestScore = result.score;
+      }
+
+      results.push({
+        id:      batch[i].id,
+        fitness: totalFitness / gamesPerEval,
+        score:   bestScore
+      });
+    }
+
+    process.send({ type: 'results', results: results });
+  }
+});</code></pre>
+
+<h3>CLI parameters</h3>
+
+<p>
+  Training is configurable from the command line:
+</p>
+
+<pre><code>bin/train [options]
+  --generations N   Number of generations         (default: 100)
+  --population N    Population size                (default: 1000)
+  --games N         Games per fitness evaluation   (default: 8)
+  --time N          Game time limit in seconds     (default: 100)
+  --workers N       Parallel worker processes      (default: CPU count - 1)
+  --output PATH     Model output path              (default: models/best.json)</code></pre>
+
+<hr>
+
+<h2>5. Inference</h2>
+
+<p>
+  Once training is complete, the best network is saved as a JSON file
+  containing its layer sizes and a flat array of weights. Inference is the
+  process of loading that file and using the network to make decisions in
+  real time.
+</p>
+
+<h3>The Agent loop</h3>
+
+<p>
+  The inference loop is remarkably simple. On every game tick: observe the
+  board, run the vision through the network, pick the direction with the
+  highest output value, and move.
+</p>
+
+<p>
+  From <code>src/agent.js</code>:
+</p>
+
+<pre><code>function Agent(neuralNet) {
+  this.net = neuralNet;
+}
+
+Agent.prototype.decide = function(game) {
+  var vision  = game.getVision();
+  var outputs = this.net.forward(vision);
+
+  var bestIdx = 0;
+  for (var i = 1; i &lt; outputs.length; i++) {
+    if (outputs[i] &gt; outputs[bestIdx]) bestIdx = i;
+  }
+  return DIRECTIONS[bestIdx];
+};
+
+Agent.prototype.play = function(game) {
+  game.reset();
+  while (game.alive) {
+    var dir = this.decide(game);
+    game.step(dir);
+  }
+  return { score: game.score, steps: game.steps };
+};</code></pre>
+
+<h3>Serialization</h3>
+
+<p>
+  The model format is intentionally minimal. <code>toJSON()</code> produces an
+  object with two keys: the layer dimensions and a flat array of every weight
+  and bias in order. <code>fromJSON()</code> reconstructs the weight matrices
+  from that flat array.
+</p>
+
+<pre><code>NeuralNet.prototype.toJSON = function() {
+  return { layers: this.layers, weights: this.getWeightsFlat() };
+};
+
+NeuralNet.fromJSON = function(json) {
+  var nn = new NeuralNet(json.layers);
+  nn.setWeightsFlat(json.weights);
+  return nn;
+};</code></pre>
+
+<p>
+  The resulting <code>models/best.json</code> file is around 7KB. It contains
+  the full brain of the trained agent. Load it in Node.js for batch
+  evaluation, or fetch it from a web server for browser inference.
+</p>
+
+<h3>Browser inference</h3>
+
+<p>
+  In the browser, the same forward pass runs inside
+  <code>scripts/ai/ai_player.js</code>. The AI player monkey-patches the
+  game's <code>moveOne()</code> method. Before each tick, it extracts vision
+  from the live DOM-based game, runs <code>forward()</code>, picks the
+  direction with the highest output, and calls <code>setDirection()</code>.
+  The game engine doesn't know or care that an AI is driving.
+</p>
+
+<hr>
+
+<h2>6. Recap</h2>
+
+<p>
+  The full pipeline, end to end:
+</p>
+
+<ol>
+  <li><strong>Initialize:</strong> Create 1,000 neural networks with random
+    weights (He initialization).</li>
+  <li><strong>Evaluate:</strong> Each network plays 8 games of Snake on a
+    headless engine. Fitness = <code>score&sup2; * 5000 + steps</code>.</li>
+  <li><strong>Select:</strong> Tournament selection picks parents from the
+    ranked population.</li>
+  <li><strong>Reproduce:</strong> Single-point crossover combines two parents.
+    Gaussian mutation adds small random perturbations.</li>
+  <li><strong>Elitism:</strong> The top 5% carry over unchanged.</li>
+  <li><strong>Repeat:</strong> Steps 2&ndash;5 run for N generations. The best
+    network is saved to <code>models/best.json</code> after each
+    generation.</li>
+  <li><strong>Inference:</strong> Load the saved model. On each tick, run
+    <code>forward(vision)</code> and pick <code>argmax(output)</code>.</li>
+</ol>
+
+<p>
+  There is no gradient descent. No backpropagation. No labeled data. The only
+  learning signal is the fitness function and the evolutionary process.
+  Networks that play well reproduce. Networks that don't are replaced. Over
+  hundreds of generations, the population converges on strategies that navigate
+  the board, seek food, and avoid collisions.
+</p>
+
+<hr>
+
+<h2>7. Browser Demo</h2>
+
+<p>
+  The project includes a browser-based debugger for watching the AI think in
+  real time. Run <code>bin/serve</code> and open
+  <code>http://localhost:8080</code>.
+</p>
+
+<h3>The 4-column debug layout</h3>
+
+<p>
+  When the AI toggle is enabled, the UI shows four columns side by side:
+</p>
+
+<ol>
+  <li><strong>Game Board:</strong> The live 30&times;30 Snake game.</li>
+  <li><strong>Vision Inputs:</strong> A table showing all 8 rays with their
+    wall distance, food presence, and body presence values, color-coded by
+    magnitude.</li>
+  <li><strong>Network Layers:</strong> A visualization of all 4 layers (24
+    &rarr; 18 &rarr; 18 &rarr; 4) with each neuron colored by its activation
+    value. Green = positive, red = negative, dark = near zero.</li>
+  <li><strong>Decision Output:</strong> Bar chart of the 4 direction scores,
+    with the chosen direction highlighted. Below that: fitness, hunger, speed,
+    and step count.</li>
+</ol>
+
+<h3>Speed control</h3>
+
+<p>
+  A slider at the top of the decision column controls game speed:
+</p>
+
+<ul>
+  <li><strong>0 (Paused):</strong> The game freezes. A "Step" button advances
+    exactly one tick per click, letting you inspect each decision.</li>
+  <li><strong>1 (Slow):</strong> 3 seconds between ticks. Readable in real
+    time.</li>
+  <li><strong>2 (Normal):</strong> The game's natural tick speed.</li>
+</ul>
+
+<p>
+  The virtual timer is synchronized with the debug speed. In slow mode, the
+  countdown timer advances at the same rate as the game ticks, not wall-clock
+  time. This means you can step through a full 300-second game at your own
+  pace.
+</p>
+
+<hr>
+
+<h2>8. Tips for Building Your Own Training and Inference Pipelines</h2>
+
+<p>
+  Building this project taught me a few things about structuring software for
+  neural network training. The core lesson: isolate your parameters. Every
+  tunable value should be independently adjustable without touching unrelated
+  code. Here are the specifics.
+</p>
+
+<h3>Separate the game engine from the renderer</h3>
+
+<p>
+  The browser game uses DOM tables, event listeners, and CSS classes. None of
+  that belongs in a training loop. This project has two game engines:
+  <code>scripts/snake/game.js</code> for the browser and
+  <code>src/headless_game.js</code> for training. The headless engine is a
+  plain JavaScript class with zero DOM dependencies. It runs thousands of
+  games per second.
+</p>
+
+<p>
+  If you're building something similar, write the headless engine first. Get
+  the rules right in isolation. Then build the renderer on top.
+</p>
+
+<h3>Keep the serialization format simple</h3>
+
+<p>
+  The model is a JSON object with two keys: <code>layers</code> (the
+  architecture) and <code>weights</code> (a flat array of numbers). That's it.
+  No framework-specific format. No binary encoding. Any language that can parse
+  JSON can load and run the model. This made it trivial to share the same model
+  between Node.js training and browser inference.
+</p>
+
+<h3>Reward what you actually want</h3>
+
+<p>
+  Early in development, the fitness function capped score at 10. The
+  population quickly learned to reach score 10 and then stalled. The fix was
+  removing the cap and making score quadratic. The lesson: if the fitness
+  function has a ceiling, your agents will hit it and stop improving.
+</p>
+
+<p>
+  Similarly, adding <code>+ steps</code> as a survival bonus was essential for
+  bootstrapping. In early generations, no agent scores at all. Without the
+  survival term, all agents have zero fitness and selection is random. The
+  linear term gives the algorithm something to select on from generation one.
+</p>
+
+<h3>Randomize starting conditions</h3>
+
+<p>
+  If every game starts with the snake in the same position facing the same
+  direction, the population will overfit to that specific scenario. Randomizing
+  the start position and direction on every game forces agents to develop
+  general strategies rather than memorized sequences.
+</p>
+
+<h3>Add constraints that force efficient behavior</h3>
+
+<p>
+  Without a time limit, agents can achieve high survival scores by circling the
+  board indefinitely. Without a starvation mechanic, they can avoid food
+  entirely and still accumulate steps. Both constraints push the population
+  toward the behavior you actually want: actively finding and consuming food.
+</p>
+
+<h3>Use parallel workers to scale evaluation</h3>
+
+<p>
+  Evaluation is embarrassingly parallel. Each agent's fitness is independent
+  of every other agent. Distributing the population across <code>N</code>
+  worker processes gives near-linear speedup. On a 16-core machine with 15
+  workers, training runs roughly 10&times; faster than single-threaded.
+</p>
+
+<h3>Ionize the key parameters</h3>
+
+<p>
+  The most productive debugging sessions came from changing a single parameter
+  and observing the effect. That's only possible if each parameter is isolated.
+  In this project, the key tunable values are:
+</p>
+
+<ul>
+  <li><strong>Fitness function:</strong> <code>score&sup2; * 5000 + steps</code></li>
+  <li><strong>Mutation rate:</strong> 5% of weights per generation</li>
+  <li><strong>Mutation scale:</strong> 0.3 (Gaussian standard deviation)</li>
+  <li><strong>Elite count:</strong> Top 5% of the population</li>
+  <li><strong>Tournament size:</strong> 5 candidates per selection</li>
+  <li><strong>Games per evaluation:</strong> 8 games averaged</li>
+  <li><strong>Time limit:</strong> 100s per game</li>
+  <li><strong>Hunger limit:</strong> <code>120 + length * 3</code> ticks</li>
+  <li><strong>Network architecture:</strong> <code>[24, 18, 18, 4]</code></li>
+</ul>
+
+<p>
+  Each of these is a named constant or CLI flag. When training stalls, you
+  change one, run a short experiment, and compare. This is the same principle
+  behind good software design: separate concerns, name things clearly, and
+  make each piece independently testable.
+</p>
+
+<p>
+  The AI doesn't need to be complicated. The game engine, the neural network,
+  the fitness function, and the evolutionary loop are each under 100 lines.
+  The power comes from the interaction between them, tuned by parameters you
+  can see and change.
+</p>
+
+<hr>
+
+<p>
+  Source:
+  <a href="https://github.com/papes1ns/snake">github.com/papes1ns/snake</a>
+</p>
+
+</body>
+</html>
