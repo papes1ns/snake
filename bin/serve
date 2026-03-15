@@ -1,0 +1,72 @@
+#!/usr/bin/env node
+
+import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+var __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+var args = parseArgs(process.argv.slice(2));
+var port = parseInt(args.port || args.p) || 8080;
+var root = path.join(__dirname, '..');
+
+var MIME_TYPES = {
+  '.html': 'text/html',
+  '.js':   'application/javascript',
+  '.json': 'application/json',
+  '.css':  'text/css',
+  '.png':  'image/png',
+  '.jpg':  'image/jpeg',
+  '.gif':  'image/gif',
+  '.svg':  'image/svg+xml',
+  '.ico':  'image/x-icon'
+};
+
+var server = http.createServer(function(req, res) {
+  var urlPath = req.url.split('?')[0];
+  if (urlPath === '/') urlPath = '/index.html';
+
+  var filePath = path.join(root, urlPath);
+  var resolved = path.resolve(filePath);
+
+  if (resolved.indexOf(path.resolve(root)) !== 0) {
+    res.writeHead(403);
+    res.end('Forbidden');
+    return;
+  }
+
+  fs.readFile(filePath, function(err, data) {
+    if (err) {
+      res.writeHead(404);
+      res.end('Not found: ' + urlPath);
+      return;
+    }
+
+    var ext         = path.extname(filePath).toLowerCase();
+    var contentType = MIME_TYPES[ext] || 'application/octet-stream';
+    res.writeHead(200, { 'Content-Type': contentType });
+    res.end(data);
+  });
+});
+
+server.listen(port, function() {
+  console.log('Snake game server running at http://localhost:' + port);
+  console.log('Press Ctrl+C to stop');
+});
+
+function parseArgs(argv) {
+  var result = {};
+  for (var i = 0; i < argv.length; i++) {
+    if (argv[i].indexOf('--') === 0) {
+      var key = argv[i].slice(2);
+      var val = argv[i + 1] && argv[i + 1].indexOf('--') !== 0 ? argv[++i] : true;
+      result[key] = val;
+    } else if (argv[i].indexOf('-') === 0 && argv[i].length === 2) {
+      var k = argv[i].slice(1);
+      var v = argv[i + 1] && argv[i + 1].indexOf('-') !== 0 ? argv[++i] : true;
+      result[k] = v;
+    }
+  }
+  return result;
+}

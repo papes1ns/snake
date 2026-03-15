@@ -27,13 +27,23 @@
     </style>
   </head>
   <body>
-    <h1>Snake</h1>
-    <h2>Score: <span id="score"></span></h2>
-    <h2>Rate: <span id="rate"></span> nodes per second</h2>
-    <button id="new-game">New Game</button>
-    </br>
-    </br>
-    <div id="main"></div>
-    <script data-main="scripts/main.js" src="scripts/lib/require.js"></script>
+    <table><tr>
+      <td valign="top">
+        <h1>Snake</h1>
+        <b>Score:</b> <span id="score"></span>
+        &nbsp; <b>Rate:</b> <span id="rate"></span>/s
+        &nbsp; <b>Time:</b> <span id="timer">0</span>s
+        &nbsp; <b>Hunger:</b> <span id="hunger"></span>
+        <br>
+        <button id="new-game">New Game</button>
+        <button id="ai-toggle">AI: OFF</button>
+        <button id="pause-toggle">Pause</button>
+        <span id="ai-status"></span>
+        <br><br>
+        <div id="main"></div>
+      </td>
+      <td valign="top"><div id="nn-panel"></div></td>
+    </tr></table>
+    <script type="module" src="scripts/main.js"></script>
   </body>
 </html>

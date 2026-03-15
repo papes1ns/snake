@@ -1,39 +1,37 @@
-define(function(require) {
-  var Constants = require("snake/constants");
+import Constants from './constants.js';
 
-  function buildKey(y, x) {
-    return [y.toString(), x.toString()].join(":");
-  };
+function buildKey(y, x) {
+  return [y.toString(), x.toString()].join(":");
+};
 
-  function Piece(y, x, type) {
-    this.positionY = y;
-    this.positionX = x;
-    this.type = type;
-  };
+function Piece(y, x, type) {
+  this.positionY = y;
+  this.positionX = x;
+  this.type = type;
+};
 
-  Piece.getNode = function(y, x) {
-    return document.querySelector('[data-key = "'+ buildKey(y,x) +'"]');
-  };
+Piece.getNode = function(y, x) {
+  return document.querySelector('[data-key = "'+ buildKey(y,x) +'"]');
+};
 
-  Piece.prototype.key = function() {
-    return buildKey(this.positionY, this.positionX);
-  };
+Piece.prototype.key = function() {
+  return buildKey(this.positionY, this.positionX);
+};
 
-  Piece.prototype.isEmpty = function() {
-    return this.type == Constants.GAME_EMPTY_PIECE;
-  };
+Piece.prototype.isEmpty = function() {
+  return this.type == Constants.GAME_EMPTY_PIECE;
+};
 
-  Piece.prototype.isFood = function() {
-    return this.type == Constants.GAME_FOOD_PIECE;
-  };
+Piece.prototype.isFood = function() {
+  return this.type == Constants.GAME_FOOD_PIECE;
+};
 
-  Piece.prototype.isSnake = function() {
-    return this.type == Constants.GAME_SNAKE_PIECE;
-  };
+Piece.prototype.isSnake = function() {
+  return this.type == Constants.GAME_SNAKE_PIECE;
+};
 
-  Piece.prototype.setType = function(type) {
-    this.type = type;
-  };
+Piece.prototype.setType = function(type) {
+  this.type = type;
+};
 
-  return Piece;
-});
+export default Piece;
