@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>How This Snake AI Neural Net Works</title>
+  </head>
+  <body>
+    <h2>Summary</h2>
+    <ul>
+      <li>Why Snake is still a good AI sandbox</li>
+      <li>How the current code shares one core across training and browser play</li>
+      <li>What the 30-input neural net actually sees</li>
+      <li>How neuroevolution trains the model in plain JavaScript</li>
+      <li>Why old projects become easier to understand once you add an eval loop</li>
+    </ul>
+
+    <hr>
+
+    <h2>Why I Like This Kind of Project</h2>
+
+    <p>
+      A lot of AI writing jumps past the useful part. You get big claims, then a
+      blurry description of what the system is doing. I wanted the opposite. This
+      Snake project is small enough to read in a sitting, but complete enough to
+      show the pieces that matter: inputs, weights, scoring, and iteration.
+    </p>
+
+    <p>
+      The code is also a good reminder that older projects are easier to learn
+      once you give them a training loop and better instrumentation. That is the
+      bigger takeaway here. You do not need to bolt an LLM onto an old codebase to
+      learn from it. You can apply the same mindset people use around LLM systems:
+      define inputs, define outputs, build an eval loop, and make the system
+      observable.
+    </p>
+
+    <p>
+      I also used Codex and Opus while working through the project. They were most
+      useful as reading and synthesis tools while I traced how the
+      <strong>neural network</strong> sees the board and chooses the next move.
+    </p>
+
+    <hr>
+
+    <h2>The Current Shape of the App</h2>
+
+    <p>
+       The
+      game rules, training loop, browser play, and neural net now fit together in
+      a way that is easier to inspect. The browser game is a thin adapter over the
+      same engine used for evaluation.
+    </p>
+
+    <p>
+      That matters because training, CLI evaluation, and browser play all read the
+      same state transitions and the same vision data. Once that was true, the AI
+      stopped feeling bolted on. It became a way to inspect the project.
+    </p>
+
+    <hr>
+
+    <h2>Why Snake Is Still Useful</h2>
+
+    <p>
+      Snake is simple, but not trivial. Early moves are open. Later moves are
+      constrained by the board and the growing body. A policy that looks fine at
+      the start usually falls apart later. That makes it a good sandbox for
+      testing decision-making.
+    </p>
+
+    <p>
+      It is also a good fit for learning an older codebase. The rules are familiar,
+      the feedback is immediate, and mistakes are easy to spot.
+    </p>
+
+    <hr>
+
+    <h2>What the Network Sees</h2>
+
+    <p>
+      The current model takes 30 inputs. The first 24 come from eight rays cast
+      out from the snake's head. Each ray reports wall distance, food visibility,
+      and body visibility. Then the engine adds four direction flags and two
+      normalized food-offset values.
+    </p>
+
+    <p>
+      The model gets more context without getting complicated.
+    </p>
+
+    <pre><code class="language-javascript">GameCore.prototype.getVision = function() {
+  var head = this.snake[0];
+  var inputs = [];
+
+  for (var r = 0; r &lt; RAY_DIRECTIONS.length; r++) {
+    var ray       = RAY_DIRECTIONS[r];
+    var distance  = 0;
+    var foodFound = 0;
+    var bodyFound = 0;
+    var y = head.y;
+    var x = head.x;
+
+    while (true) {
+      y += ray.dy;
+      x += ray.dx;
+      distance++;
+
+      if (y &lt; 0 || y &gt;= this.height || x &lt; 0 || x &gt;= this.width) break;
+
+      if (this.board[y][x] === FOOD  &amp;&amp; !foodFound) foodFound = 1;
+      if (this.board[y][x] === SNAKE &amp;&amp; !bodyFound) bodyFound = 1;
+    }
+
+    inputs.push(1 / distance);
+    inputs.push(foodFound);
+    inputs.push(bodyFound);
+  }
+
+  inputs.push(this.direction === DIRECTION_NORTH ? 1 : 0);
+  inputs.push(this.direction === DIRECTION_EAST  ? 1 : 0);
+  inputs.push(this.direction === DIRECTION_SOUTH ? 1 : 0);
+  inputs.push(this.direction === DIRECTION_WEST  ? 1 : 0);
+  inputs.push((this.food.y - head.y) / this.height);
+  inputs.push((this.food.x - head.x) / this.width);
+
+  return inputs;
+};</code></pre>
+
+    <p>
+      In short, the input vector is 24 ray features, 4 direction flags, and 2
+      food-offset values. That gives the agent local obstacle awareness plus just
+      enough global context to make better turns.
+    </p>
+
+    <hr>
+
+    <h2>How the Neural Net Is Built</h2>
+
+    <p>
+      The current model shape is <code>[30, 20, 20, 4]</code>. That means 30
+      inputs, two hidden layers with 20 neurons each, and 4 outputs for north,
+      east, south, and west. The selected move is just the index of the largest
+      output.
+    </p>
+
+    <p>
+      Hidden layers use ReLU. The output layer stays linear. Weights use He
+      initialization. Biases start at zero. Nothing exotic here. That is part of
+      the appeal.
+    </p>
+
+    <pre><code class="language-javascript">NeuralNet.prototype.forward = function(inputs) {
+  var activation = inputs;
+  this.lastActivations = [inputs];
+
+  for (var i = 0; i &lt; this.weights.length; i++) {
+    var w = this.weights[i];
+    var b = this.biases[i];
+    var isOutput = (i === this.weights.length - 1);
+    var next = [];
+
+    for (var j = 0; j &lt; w.length; j++) {
+      var sum = b[j];
+      for (var k = 0; k &lt; activation.length; k++) {
+        sum += w[j][k] * activation[k];
+      }
+      next.push(isOutput ? sum : Math.max(0, sum));
+    }
+
+    activation = next;
+    this.lastActivations.push(activation);
+  }
+
+  return activation;
+};</code></pre>
+
+    <p>
+      This network has
+      <code>(30*20 + 20) + (20*20 + 20) + (20*4 + 4) = 1124</code> total
+      parameters. Small by modern standards. More than enough for Snake.
+    </p>
+
+    <hr>
+
+    <h2>How Training Works</h2>
+
+    <p>
+      Training uses neuroevolution, not backpropagation. A population of neural
+      nets plays Snake. The best performers are kept, combined, and mutated into the
+      next generation.
+    </p>
+
+    <p>
+      The important part is the eval loop. Play a lot of games, score the result,
+      keep the better models, and perturb them slightly. That is enough to learn a
+      useful policy here.
+    </p>
+
+    <pre><code class="language-javascript">GeneticAlgorithm.prototype.fitness = function(score, steps) {
+  return score * score * 5000 + steps;
+};</code></pre>
+
+    <p>
+      Squaring score makes food matter a lot more than stalling. The
+      <code>+ steps</code> term still helps early generations, when many nets
+      score zero and need some weaker signal to separate bad from less bad.
+    </p>
+
+    <h2>How the Net Picks the Next Move</h2>
+
+    <p>
+      The smallest useful mental model is this: collect vision, run a forward
+      pass, and choose the largest output. That is the whole decision loop.
+    </p>
+
+    <pre><code class="language-javascript">function decide(game) {
+  var vision  = game.getVision();
+  var outputs = this.net.forward(vision);
+  var bestIdx = 0;
+
+  for (var i = 1; i &lt; outputs.length; i++) {
+    if (outputs[i] &gt; outputs[bestIdx]) bestIdx = i;
+  }
+
+  return DIRECTIONS[bestIdx];
+}</code></pre>
+
+    <p>
+      If you want to understand the net, that is the part to stare at. Vision
+      turns the board into numbers. The forward pass turns numbers into scores.
+      The highest score becomes the move.
+    </p>
+
+    <ul>
+      <li>Read the board as a compact input vector</li>
+      <li>Run the input vector through the net</li>
+      <li>Pick the output with the highest score</li>
+    </ul>
+
+    <p>
+      That is why this project is useful as a learning tool. The decision path is
+      short enough to follow all the way through.
+    </p>
+
+    <hr>
+
+    <h2>The Part That Transfers</h2>
+
+    <p>
+      The useful part here is not that Snake somehow turned into an LLM project.
+      It did not. The useful part is that an LLM-style training mindset made the
+      project easier to understand. I had to define the inputs clearly. I had to
+      decide what success looked like. I had to build an eval loop. I had to make
+      intermediate state visible.
+    </p>
+
+    <p>
+      That is a good way to learn an older codebase. Pick a narrow loop. Expose
+      the state. Score the result. Run it over and over. Once you can evaluate a
+      system, you can start understanding it. Once you can inspect it, you can
+      change it with more confidence.
+    </p>
+
+    <p>
+      That is the main takeaway I would keep. Old projects get a lot less opaque
+      once you treat them like systems you can probe, measure, and iterate on.
+    </p>
+
+    <hr>
+
+    <p>
+      Source:
+      <a href="https://github.com/papes1ns/snake">github.com/papes1ns/snake</a>
+    </p>
+  </body>
+</html>
